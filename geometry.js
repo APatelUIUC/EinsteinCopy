@@ -89,8 +89,37 @@ function intersect( p1, q1, p2, q2 )
     return pt( p1.x + uA * (q1.x - p1.x), p1.y + uA * (q1.y - p1.y) );
 }
 
-const hat_outline = [
-    hexPt(0, 0), hexPt(-1,-1), hexPt(0,-2), hexPt(2,-2),
-    hexPt(2,-1), hexPt(4,-2), hexPt(5,-1), hexPt(4, 0),
-    hexPt(3, 0), hexPt(2, 2), hexPt(0, 3), hexPt(0, 2),
-    hexPt(-1, 2) ];
+const hat_hex_base = [
+        [0, 0], [-1, -1], [0, -2], [2, -2],
+        [2, -1], [4, -2], [5, -1], [4, 0],
+        [3, 0], [2, 2], [0, 3], [0, 2],
+        [-1, 2] ];
+
+const hat_hex_offsets = [
+        [0, 0], [-0.3, -0.2], [-0.1, -0.3], [0.35, -0.25],
+        [0.25, 0.6], [0.55, -0.25], [0.65, 0.55], [0.35, 0.35],
+        [0.2, 0.5], [-0.6, 0.45], [-0.55, 0.3], [-0.2, 0.45],
+        [-0.15, 0.35] ];
+
+function clamp01( s )
+{
+        return Math.max( 0, Math.min( 1, s ) );
+}
+
+function buildHatOutline( s )
+{
+        const t = clamp01( s );
+        const outline = [];
+
+        for( let idx = 0; idx < hat_hex_base.length; ++idx ) {
+                const base = hat_hex_base[idx];
+                const offset = hat_hex_offsets[idx];
+                outline.push( hexPt(
+                        base[0] + offset[0] * t,
+                        base[1] + offset[1] * t ) );
+        }
+
+        return outline;
+}
+
+let hat_outline = buildHatOutline( 0 );
