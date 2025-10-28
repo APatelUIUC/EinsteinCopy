@@ -14,6 +14,9 @@ let scale_button;
 let draw_hats;
 let draw_super;
 let radio;
+let shapeSelector;
+let currentShapeKey = 'hat';
+let currentBaseTileDefinitions = null;
 
 let dragging = false;
 let uibox = true;
@@ -261,77 +264,68 @@ const T_hat = new HatTile( 'T' );
 const P_hat = new HatTile( 'P' );
 const F_hat = new HatTile( 'F' );
 
-const H_init = (function () {
-	const H_outline = [
-		pt( 0, 0 ), pt( 4, 0 ), pt( 4.5, hr3 ),
-		pt( 2.5, 5 * hr3 ), pt( 1.5, 5 * hr3 ), pt( -0.5, hr3 ) ];
-	const meta = new MetaTile( H_outline, 2 );
+const hatTileLookup = {
+        'H1': H1_hat,
+        'H': H_hat,
+        'T': T_hat,
+        'P': P_hat,
+        'F': F_hat
+};
 
-	meta.addChild( 
-		matchTwo( 
-			hat_outline[5], hat_outline[7], H_outline[5], H_outline[0] ),
-		H_hat );
-	meta.addChild( 
-		matchTwo( 
-			hat_outline[9], hat_outline[11], H_outline[1], H_outline[2] ),
-		H_hat );
-	meta.addChild( 
-		matchTwo( 
-			hat_outline[5], hat_outline[7], H_outline[3], H_outline[4] ),
-		H_hat );
-	meta.addChild( 
-		mul( ttrans( 2.5, hr3 ), 
-			mul( 
-				[-0.5,-hr3,0,hr3,-0.5,0],
-				[0.5,0,0,0,-0.5,0] ) ),
-		H1_hat );
+function instantiateMetaTileDefinition( def )
+{
+        const meta = new MetaTile(
+                def.shape.map( (p) => pt( p.x, p.y ) ),
+                def.width );
 
-	return meta; }());
+        for( const child of def.children ) {
+                const geom = hatTileLookup[child.label];
+                meta.addChild( child.T.slice(), geom );
+        }
 
-const T_init = (function () {
-	const T_outline = [
-		pt( 0, 0 ), pt( 3, 0 ), pt( 1.5, 3 * hr3 ) ];
-	const meta = new MetaTile( T_outline, 2 );
+        return meta;
+}
 
-	meta.addChild( 
-		[0.5, 0, 0.5, 0, 0.5, hr3],
-		T_hat );
+function createBaseTiles()
+{
+        if( currentBaseTileDefinitions == null ) {
+                throw new Error( 'No hat shape definitions have been loaded' );
+        }
 
-	return meta; }());
+        return ['H', 'T', 'P', 'F'].map(
+                ( key ) => instantiateMetaTileDefinition( currentBaseTileDefinitions[key] )
+        );
+}
 
-const P_init = (function () {
-	const P_outline = [
-		pt( 0, 0 ), pt( 4, 0 ), 
-		pt( 3, 2 * hr3 ), pt( -1, 2 * hr3 ) ];
-	const meta = new MetaTile( P_outline, 2 );
+function rebuildTiles()
+{
+        tiles = createBaseTiles();
+        const depth = Math.max( 1, level );
 
-	meta.addChild( 
-		[0.5, 0, 1.5, 0, 0.5, hr3],
-		P_hat );
-	meta.addChild( 
-		mul( ttrans( 0, 2 * hr3 ), 
-			mul( [0.5, hr3, 0, -hr3, 0.5, 0],
-				 [0.5, 0.0, 0.0, 0.0, 0.5, 0.0] ) ),
-		P_hat );
+        for( let idx = 1; idx < depth; ++idx ) {
+                const patch = constructPatch( ...tiles );
+                tiles = constructMetatiles( patch );
+        }
+}
 
-	return meta; }());
+function applyHatShape( shapeKey )
+{
+        const def = getHatShape( shapeKey );
+        currentShapeKey = shapeKey;
+        hat_outline = def.outline;
+        currentBaseTileDefinitions = def.tiles;
+        rebuildTiles();
+}
 
-const F_init = (function () {
-	const F_outline = [
-		pt( 0, 0 ), pt( 3, 0 ), 
-		pt( 3.5, hr3 ), pt( 3, 2 * hr3 ), pt( -1, 2 * hr3 ) ];
-	const meta = new MetaTile( F_outline, 2 );
+function onHatShapeChange()
+{
+        if( shapeSelector == null ) {
+                return;
+        }
 
-	meta.addChild( 
-		[0.5, 0, 1.5, 0, 0.5, hr3],
-		F_hat );
-	meta.addChild( 
-		mul( ttrans( 0, 2 * hr3 ), 
-			mul( [0.5, hr3, 0, -hr3, 0.5, 0],
-				 [0.5, 0.0, 0.0, 0.0, 0.5, 0.0] ) ),
-		F_hat );
-
-	return meta; }());
+        applyHatShape( shapeSelector.value() );
+        loop();
+}
 
 function constructPatch( H, T, P, F )
 {
@@ -480,34 +474,49 @@ function addButton( name, f )
 }
 
 function setup() {
-	createCanvas( windowWidth, windowHeight );
+        createCanvas( windowWidth, windowHeight );
 
-	tiles = [H_init, T_init, P_init, F_init];
-	level = 1;
+        level = 1;
+        applyHatShape( currentShapeKey );
 
-	black = color( 'black' );
+        black = color( 'black' );
 
-	reset_button = addButton( "Reset", function() {
-		tiles = [H_init, T_init, P_init, F_init];
-		level = 1;
-		radio.selected( 'H' );
-		to_screen = [20, 0, 0, 0, -20, 0];
-		lw_scale = 1;
-		setButtonActive( draw_hats, true );
-		setButtonActive( draw_super, true );
-		loop();
-	} );
-	subst_button = addButton( "Build Supertiles", function() {
-		const patch = constructPatch( ...tiles );
-		tiles = constructMetatiles( patch );
-		++level;
-		loop();
-	} );
-	box_height += 10;
+        reset_button = addButton( "Reset", function() {
+                level = 1;
+                applyHatShape( currentShapeKey );
+                radio.selected( 'H' );
+                to_screen = [20, 0, 0, 0, -20, 0];
+                lw_scale = 1;
+                setButtonActive( draw_hats, true );
+                setButtonActive( draw_super, true );
+                loop();
+        } );
+        subst_button = addButton( "Build Supertiles", function() {
+                const patch = constructPatch( ...tiles );
+                tiles = constructMetatiles( patch );
+                ++level;
+                loop();
+        } );
+        box_height += 10;
 
-	radio = createRadio();
-	radio.mousePressed( function() { loop() } );
-	radio.position( 10, box_height );
+        const shapeLabel = createSpan( 'Hat shape' );
+        shapeLabel.position( 10, box_height );
+        box_height += 18;
+
+        shapeSelector = createSelect();
+        shapeSelector.position( 10, box_height );
+        shapeSelector.style( 'width', '125px' );
+        for( const key of listHatShapeKeys() ) {
+                const label = key.charAt( 0 ).toUpperCase() + key.slice( 1 );
+                shapeSelector.option( label, key );
+        }
+        shapeSelector.selected( currentShapeKey );
+        shapeSelector.changed( onHatShapeChange );
+        box_height += 35;
+
+        radio = createRadio();
+        radio.mousePressed( function() { loop() } );
+        radio.position( 10, box_height );
 	for( let s of ['H', 'T', 'P', 'F'] ) {
 		let o = radio.option( s );
 		o.onclick = loop;
@@ -578,11 +587,12 @@ function setup() {
 		draw();
 	} );
 
-	addButton( "Save SVG", function () {
-		svg_serial = 0;
-		for( let t of tiles ) {
-			t.resetSVG();
-		}
+        addButton( "Save SVG", function () {
+                applyHatShape( currentShapeKey );
+                svg_serial = 0;
+                for( let t of tiles ) {
+                        t.resetSVG();
+                }
 
 		const stream = [];
 		stream.push( `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">` );
